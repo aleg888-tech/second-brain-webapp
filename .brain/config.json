@@ -1,0 +1,7 @@
+{
+  "kbPath": "../kb",
+  "extensions": [".md", ".csv", ".txt"],
+  "exclude": ["_archivio", ".git"],
+  "agentDeny": [],
+  "agentUrl": ""
+}
