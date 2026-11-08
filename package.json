@@ -16,6 +16,8 @@
   "scripts": {
     "dev": "concurrently -k -n api,web -c blue,green \"npm run dev -w api\" \"npm run dev -w web\"",
     "build:web": "npm run build -w @brain/web",
+    "deploy:pages": "node scripts/deploy-pages.js",
+    "deploy:pages:dry": "node scripts/deploy-pages.js --dry-run",
     "kb:sync": "node scripts/kb-sync.js sync",
     "kb:status": "node scripts/kb-sync.js status",
     "check:separazione": "node scripts/check-separazione.js",

@@ -35,3 +35,13 @@ Aggiungi la seguente variabile di produzione per Node:
 Grazie all'impostazione di **Root directory** su `webapp`:
 - Cloudflare Pages valuta le modifiche relative alla directory `webapp`.
 - Eventuali commit con prefisso `kb:` che modificano esclusivamente note e file sotto `kb/` non avvieranno un nuovo ciclo di compilazione dell'interfaccia, risparmiando minuti di build e preservando i deploy.
+
+---
+
+## 5. Nota: Alternativa Privata a GitHub Pages
+
+> [!TIP]
+> A differenza di GitHub Pages (che sul piano gratuito richiede un repository pubblico separato per ospitare i file compilati), **Cloudflare Pages supporta repository GitHub privati anche sul piano gratuito**.
+> 
+> Se desideri mantenere l'intero progetto in un unico repository privato senza mai pubblicare codice o build in chiaro su GitHub, Cloudflare Pages è la soluzione architetturale raccomandata.
+
