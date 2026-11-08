@@ -635,3 +635,17 @@ export type AgentEvent =
     }
   | { type: 'error'; message: string; code?: string }
   | { type: 'done'; steps: number; reason: AgentDoneReason };
+
+// ---------------------------------------------------------------------------
+// Sincronizzazione GitHub per Monorepo
+// ---------------------------------------------------------------------------
+
+export interface GithubSyncProfile {
+  nome: string;
+  owner: string;
+  repo: string;
+  branch: string;
+  /** Sottocartella in cui risiede la knowledge base (default 'kb'). */
+  percorsoKb: string;
+}
+
