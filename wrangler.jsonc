@@ -1,5 +1,5 @@
 {
-  "name": "second-brain",
+  "name": "second-brain-webapp",
   "compatibility_date": "2026-11-08",
   "assets": {
     "directory": "./web/dist",
