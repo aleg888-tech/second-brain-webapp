@@ -45,6 +45,48 @@ export function App() {
   const [tokenInput, setTokenInput] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(api.hasToken());
 
+  // Supporto modalità online GitHub
+  const isGithubMode = api.isGithubMode();
+  const initialGhConfig = api.github.getConfig();
+  const [ghOwner, setGhOwner] = useState(initialGhConfig.owner || 'aleg888-tech');
+  const [ghRepo, setGhRepo] = useState(initialGhConfig.repo || 'second-brain');
+  const [ghBranch, setGhBranch] = useState(initialGhConfig.branch || 'main');
+  const [ghFolder, setGhFolder] = useState(initialGhConfig.percorsoKb || 'kb');
+  const [ghToken, setGhToken] = useState(initialGhConfig.token || '');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+  const [githubSettingsOpen, setGithubSettingsOpen] = useState(false);
+
+  const handleGithubConnect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ghToken.trim()) {
+      setAuthError('Inserisci un GitHub Personal Access Token.');
+      return;
+    }
+    setIsValidating(true);
+    setAuthError(null);
+    try {
+      api.github.setConfig({
+        owner: ghOwner.trim() || 'aleg888-tech',
+        repo: ghRepo.trim() || 'second-brain',
+        branch: ghBranch.trim() || 'main',
+        percorsoKb: ghFolder.trim() || 'kb',
+        token: ghToken.trim(),
+      });
+      const check = await api.github.validateConnection();
+      if (!check.success) {
+        setAuthError(check.error || 'Impossibile connettersi al repository.');
+        setIsValidating(false);
+        return;
+      }
+      setIsAuthenticated(true);
+    } catch (err: any) {
+      setAuthError(err.message || 'Errore di connessione a GitHub.');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
   // Stato dati dell'applicazione
   const [config, setConfig] = useState<ConfigResponse | null>(null);
   const [treeEntries, setTreeEntries] = useState<TreeEntry[]>([]);
@@ -198,10 +240,11 @@ export function App() {
     }
   }, [isAuthenticated, loadInitialData]);
 
-  // 3. Polling leggero ogni 2 secondi per rilevare modifiche esterne (/v1/status)
+  // 3. Polling per rilevare modifiche esterne (ogni 2s in locale, ogni 20s su GitHub per i rate-limit)
   useEffect(() => {
     if (!isAuthenticated) return;
 
+    const pollInterval = isGithubMode ? 20000 : 2000;
     const interval = setInterval(async () => {
       try {
         const status = await api.getStatus();
@@ -246,10 +289,10 @@ export function App() {
       } catch {
         // Ignora errori transitori di polling
       }
-    }, 2000);
+    }, pollInterval);
 
     return () => clearInterval(interval);
-  }, [isAuthenticated, showArchived, activePath, tabs]);
+  }, [isAuthenticated, showArchived, activePath, tabs, isGithubMode]);
 
   // 4. Apertura di un file
   const openFile = async (path: string) => {
@@ -1016,6 +1059,202 @@ export function App() {
 
   // Se l'utente non ha ancora il token autenticato, mostra schermata di accesso
   if (!isAuthenticated) {
+    if (isGithubMode) {
+      return (
+        <div
+          style={{
+            width: '100vw',
+            height: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--bg-app)',
+            padding: '20px',
+          }}
+        >
+          <div
+            style={{
+              maxWidth: '480px',
+              width: '100%',
+              padding: '32px',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-strong)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-lg)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <span style={{ fontSize: '32px' }}>🧠</span>
+              <div>
+                <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>Second Brain</h2>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
+                  Connessione Knowledge Base (GitHub)
+                </p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '20px' }}>
+              La webapp di frontend è separata e indipendente dalle tue note.
+              Inserisci il tuo <strong>GitHub Personal Access Token</strong> per accedere in sicurezza al tuo repository privato.
+            </p>
+
+            {authError && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid var(--danger, #ef4444)',
+                  color: 'var(--danger, #ef4444)',
+                  fontSize: '13px',
+                  marginBottom: '16px',
+                }}
+              >
+                <AlertTriangle size={16} />
+                <span>{authError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleGithubConnect}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    Owner
+                  </label>
+                  <input
+                    type="text"
+                    value={ghOwner}
+                    onChange={(e) => setGhOwner(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-strong)',
+                      background: 'var(--bg-sidebar)',
+                      fontSize: '13px',
+                      color: 'var(--text-main)',
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    Repository
+                  </label>
+                  <input
+                    type="text"
+                    value={ghRepo}
+                    onChange={(e) => setGhRepo(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-strong)',
+                      background: 'var(--bg-sidebar)',
+                      fontSize: '13px',
+                      color: 'var(--text-main)',
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    Branch
+                  </label>
+                  <input
+                    type="text"
+                    value={ghBranch}
+                    onChange={(e) => setGhBranch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-strong)',
+                      background: 'var(--bg-sidebar)',
+                      fontSize: '13px',
+                      color: 'var(--text-main)',
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    Cartella note
+                  </label>
+                  <input
+                    type="text"
+                    value={ghFolder}
+                    onChange={(e) => setGhFolder(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-strong)',
+                      background: 'var(--bg-sidebar)',
+                      fontSize: '13px',
+                      color: 'var(--text-main)',
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '18px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                  GitHub Personal Access Token (PAT)
+                </label>
+                <input
+                  type="password"
+                  placeholder="Incolla token (ghp_... o github_pat_...)"
+                  value={ghToken}
+                  onChange={(e) => setGhToken(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-strong)',
+                    background: 'var(--bg-sidebar)',
+                    fontSize: '13px',
+                    color: 'var(--text-main)',
+                    outline: 'none',
+                  }}
+                  required
+                />
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.4 }}>
+                  🔒 Memorizzato <strong>esclusivamente nel tuo browser</strong> (localStorage). Non passa per Cloudflare.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isValidating}
+                style={{
+                  width: '100%',
+                  padding: '11px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--accent)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: isValidating ? 'wait' : 'pointer',
+                  opacity: isValidating ? 0.7 : 1,
+                }}
+              >
+                {isValidating ? 'Verifica credenziali...' : 'Connetti alla Knowledge Base'}
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div
         style={{
@@ -1126,6 +1365,9 @@ export function App() {
           onToggleRightPanel={handleToggleRightPanel}
           chatOpen={chatOpen}
           onToggleChat={() => setChatOpen(!chatOpen)}
+          isGithubMode={isGithubMode}
+          githubRepo={`${ghOwner}/${ghRepo}`}
+          onOpenGithubSettings={() => setGithubSettingsOpen(true)}
         />
 
         {/* Area Centrale Editor / Anteprima */}
@@ -1395,6 +1637,110 @@ export function App() {
         onClose={() => setChatOpen(false)}
         agentUrl={config?.agentDeny ? undefined : undefined}
       />
+
+      {/* Modale Gestione Connessione GitHub */}
+      {githubSettingsOpen && (
+        <div
+          className="modal-overlay"
+          onClick={() => setGithubSettingsOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="modal-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '440px',
+              width: '100%',
+              padding: '24px',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-strong)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-lg)',
+            }}
+          >
+            <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '12px' }}>
+              Stato Connessione GitHub
+            </h3>
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '20px' }}>
+              <div><strong>Repository:</strong> {api.github.getConfig().owner}/{api.github.getConfig().repo}</div>
+              <div><strong>Branch:</strong> {api.github.getConfig().branch}</div>
+              <div><strong>Cartella note:</strong> {api.github.getConfig().percorsoKb}/</div>
+              <div style={{ marginTop: '8px', color: '#10b981', fontWeight: 600 }}>
+                ● Connesso al repository privato
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  api.github.clearConfig();
+                  setIsAuthenticated(false);
+                  setTabs([]);
+                  setActivePath(null);
+                  setGithubSettingsOpen(false);
+                }}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'transparent',
+                  border: '1px solid var(--border-strong)',
+                  color: 'var(--danger, #ef4444)',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                }}
+              >
+                Disconnetti
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={async () => {
+                  await refreshTreeAndPages(showArchived);
+                  setGithubSettingsOpen(false);
+                }}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-strong)',
+                  color: 'var(--text-main)',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                }}
+              >
+                Ricarica albero
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setGithubSettingsOpen(false)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--accent)',
+                  color: '#ffffff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                }}
+              >
+                Chiudi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

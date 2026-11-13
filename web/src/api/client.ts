@@ -34,6 +34,7 @@ import type {
   Vista,
   WriteResult,
 } from '@brain/shared';
+import { GithubClient } from './githubClient.js';
 
 const TOKEN_KEY = 'brain_token';
 
@@ -41,10 +42,39 @@ export class ApiClient {
   private token: string | null = null;
   private readonly baseUrl: string;
   private readonly attachmentUrlCache = new Map<string, Promise<string | null>>();
+  readonly github: GithubClient;
 
   constructor(baseUrl = 'http://127.0.0.1:4310') {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.token = this.extractToken();
+    this.github = new GithubClient();
+  }
+
+  /**
+   * Determina se l'applicazione deve funzionare in modalità GitHub online
+   * (su Cloudflare, GitHub Pages o host remoto) oppure in locale con Express backend.
+   */
+  isGithubMode(): boolean {
+    if (typeof window === 'undefined') return false;
+
+    // Possibilità di forzare la modalità via querystring (?backend=github oppure ?backend=local)
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const queryBackend = searchParams.get('backend');
+      if (queryBackend === 'github') return true;
+      if (queryBackend === 'local') return false;
+    } catch {
+      // ignore
+    }
+
+    // Modalità impostata esplicitamente da build Vite
+    if (import.meta.env?.VITE_BACKEND === 'github') {
+      return true;
+    }
+
+    // Se l'host non è locale (127.0.0.1 o localhost), usa GitHub mode
+    const host = window.location.hostname;
+    return Boolean(host && host !== '127.0.0.1' && host !== 'localhost');
   }
 
   /**
@@ -86,7 +116,10 @@ export class ApiClient {
   }
 
   hasToken(): boolean {
-    return true; // Disattivato per ora su richiesta
+    if (this.isGithubMode()) {
+      return this.github.hasToken();
+    }
+    return true; // Disattivato per ora in locale
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -128,14 +161,24 @@ export class ApiClient {
   }
 
   getStatus(): Promise<StatusResponse> {
+    if (this.isGithubMode()) {
+      return this.github.getStatus();
+    }
     return this.request<StatusResponse>('/v1/status');
   }
 
   getConfig(): Promise<ConfigResponse> {
+    if (this.isGithubMode()) {
+      return this.github.getConfigResponse();
+    }
     return this.request<ConfigResponse>('/v1/config');
   }
 
   async getTree(all = false): Promise<TreeEntry[]> {
+    if (this.isGithubMode()) {
+      const res = await this.github.getTreeWithPages(all);
+      return res.entries;
+    }
     const res = await this.request<TreeResponse>(`/v1/tree${all ? '?all=true' : ''}`);
     return res.entries;
   }
@@ -145,6 +188,9 @@ export class ApiClient {
     pages: PageIdentity[];
     duplicateIds: DuplicateIdWarning[];
   }> {
+    if (this.isGithubMode()) {
+      return this.github.getTreeWithPages(all);
+    }
     const res = await this.request<TreeResponse>(`/v1/tree${all ? '?all=true' : ''}`);
     return {
       entries: res.entries,
@@ -154,10 +200,16 @@ export class ApiClient {
   }
 
   getFile(path: string): Promise<FileContent> {
+    if (this.isGithubMode()) {
+      return this.github.getFile(path);
+    }
     return this.request<FileContent>(`/v1/files/content?path=${encodeURIComponent(path)}`);
   }
 
   saveFile(path: string, content: string, baseVersion: string): Promise<WriteResult> {
+    if (this.isGithubMode()) {
+      return this.github.saveFile(path, content, baseVersion);
+    }
     return this.request<WriteResult>('/v1/files/content', {
       method: 'POST',
       body: JSON.stringify({ path, content, baseVersion }),
@@ -171,6 +223,9 @@ export class ApiClient {
     baseVersion: string,
     unset = false,
   ): Promise<FrontmatterPatchResponse> {
+    if (this.isGithubMode()) {
+      return this.github.patchFrontmatter(path, key, value, baseVersion, unset);
+    }
     return this.request<FrontmatterPatchResponse>('/v1/files/frontmatter-patch', {
       method: 'POST',
       body: JSON.stringify({ path, key, value, baseVersion, unset }),
@@ -178,6 +233,9 @@ export class ApiClient {
   }
 
   createFile(path: string, content = ''): Promise<WriteResult> {
+    if (this.isGithubMode()) {
+      return this.github.createFile(path, content);
+    }
     return this.request<WriteResult>('/v1/files/create', {
       method: 'POST',
       body: JSON.stringify({ path, content }),
@@ -185,6 +243,9 @@ export class ApiClient {
   }
 
   convertLeafToNode(path: string): Promise<ConvertLeafToNodeResponse> {
+    if (this.isGithubMode()) {
+      return this.github.convertLeafToNode(path);
+    }
     return this.request<ConvertLeafToNodeResponse>('/v1/pages/convert-to-node', {
       method: 'POST',
       body: JSON.stringify({ path }),
@@ -196,6 +257,9 @@ export class ApiClient {
     title?: string,
     content?: string,
   ): Promise<CreateSubpageResponse> {
+    if (this.isGithubMode()) {
+      return this.github.createSubpage(parentPath, title, content);
+    }
     return this.request<CreateSubpageResponse>('/v1/pages/create-subpage', {
       method: 'POST',
       body: JSON.stringify({ parentPath, title, content }),
@@ -203,6 +267,15 @@ export class ApiClient {
   }
 
   alignIds(dryRun = true): Promise<AlignIdsResponse> {
+    if (this.isGithubMode()) {
+      return Promise.resolve({
+        dryRun,
+        count: 0,
+        paths: [],
+        modified: [],
+        duplicates: [],
+      });
+    }
     return this.request<AlignIdsResponse>('/v1/pages/align-ids', {
       method: 'POST',
       body: JSON.stringify({ dryRun }),
@@ -254,11 +327,20 @@ export class ApiClient {
   }
 
   async listAttachments(): Promise<string[]> {
+    if (this.isGithubMode()) {
+      const tree = await this.getTree();
+      return tree
+        .filter((e) => e.type === 'file' && e.path.startsWith('allegati/'))
+        .map((e) => e.path.slice('allegati/'.length));
+    }
     const res = await this.request<AttachmentListResponse>('/v1/attachments');
     return res.files;
   }
 
   uploadAttachment(filename: string, dataBase64: string): Promise<AttachmentUploadResponse> {
+    if (this.isGithubMode()) {
+      return this.github.uploadAttachment(filename, dataBase64);
+    }
     return this.request<AttachmentUploadResponse>('/v1/attachments', {
       method: 'POST',
       body: JSON.stringify({ filename, dataBase64 }),
@@ -270,6 +352,12 @@ export class ApiClient {
     if (!clean) return Promise.resolve(null);
     const cached = this.attachmentUrlCache.get(clean);
     if (cached) return cached;
+
+    if (this.isGithubMode()) {
+      const p = this.github.getAttachmentObjectUrl(clean);
+      this.attachmentUrlCache.set(clean, p);
+      return p;
+    }
 
     const promise = (async () => {
       try {
@@ -293,6 +381,9 @@ export class ApiClient {
   }
 
   createFolder(path: string): Promise<{ success: boolean; path: string }> {
+    if (this.isGithubMode()) {
+      return Promise.resolve({ success: true, path });
+    }
     return this.request<{ success: boolean; path: string }>('/v1/folders/create', {
       method: 'POST',
       body: JSON.stringify({ path }),
@@ -300,6 +391,9 @@ export class ApiClient {
   }
 
   rename(from: string, to: string): Promise<MoveResult> {
+    if (this.isGithubMode()) {
+      return this.github.rename(from, to);
+    }
     return this.request<MoveResult>('/v1/files/rename', {
       method: 'POST',
       body: JSON.stringify({ from, to }),
@@ -307,6 +401,9 @@ export class ApiClient {
   }
 
   archive(path: string): Promise<MoveResult> {
+    if (this.isGithubMode()) {
+      return this.github.archive(path);
+    }
     return this.request<MoveResult>('/v1/files/archive', {
       method: 'POST',
       body: JSON.stringify({ path }),
@@ -314,12 +411,18 @@ export class ApiClient {
   }
 
   deleteFile(path: string): Promise<{ path: string }> {
+    if (this.isGithubMode()) {
+      return this.github.deleteFile(path);
+    }
     return this.request<{ path: string }>(`/v1/files/${encodeURIComponent(path)}`, {
       method: 'DELETE',
     });
   }
 
   async getHistory(path: string): Promise<HistoryEntry[]> {
+    if (this.isGithubMode()) {
+      return this.github.getHistory(path);
+    }
     const res = await this.request<{ path: string; entries: HistoryEntry[] }>(
       `/v1/files/history?path=${encodeURIComponent(path)}`,
     );
@@ -327,12 +430,18 @@ export class ApiClient {
   }
 
   getHistoryVersion(path: string, id: string): Promise<HistoryVersionResponse> {
+    if (this.isGithubMode()) {
+      return this.github.getHistoryVersion(path, id);
+    }
     return this.request<HistoryVersionResponse>(
       `/v1/files/history/version?path=${encodeURIComponent(path)}&id=${encodeURIComponent(id)}`,
     );
   }
 
   restoreHistory(path: string, id: string): Promise<WriteResult> {
+    if (this.isGithubMode()) {
+      return this.github.restoreHistory(path, id);
+    }
     return this.request<WriteResult>('/v1/files/history/restore', {
       method: 'POST',
       body: JSON.stringify({ path, id }),
@@ -340,6 +449,9 @@ export class ApiClient {
   }
 
   search(q: string, limit = 100, includeArchived = false): Promise<SearchResponse> {
+    if (this.isGithubMode()) {
+      return this.github.search(q, limit);
+    }
     const query = new URLSearchParams({
       q,
       limit: String(limit),
@@ -349,19 +461,31 @@ export class ApiClient {
   }
 
   getLinks(path: string): Promise<LinksResponse> {
+    if (this.isGithubMode()) {
+      return this.github.getLinks(path);
+    }
     return this.request<LinksResponse>(`/v1/links?path=${encodeURIComponent(path)}`);
   }
 
   async getTags(): Promise<TagInfo[]> {
+    if (this.isGithubMode()) {
+      return this.github.getTags();
+    }
     const res = await this.request<TagsResponse>('/v1/tags');
     return res.tags;
   }
 
   getVista(): Promise<Vista> {
+    if (this.isGithubMode()) {
+      return this.github.getVista();
+    }
     return this.request<Vista>('/v1/vista');
   }
 
   updateVista(patch: Partial<Vista>): Promise<Vista> {
+    if (this.isGithubMode()) {
+      return this.github.updateVista(patch);
+    }
     return this.request<Vista>('/v1/vista', {
       method: 'PUT',
       body: JSON.stringify(patch),
@@ -369,10 +493,20 @@ export class ApiClient {
   }
 
   getAgentStatus(): Promise<AgentStatus> {
+    if (this.isGithubMode()) {
+      return Promise.resolve({
+        configured: false,
+        model: null,
+        maxSteps: 0,
+      });
+    }
     return this.request<AgentStatus>('/v1/agent/status');
   }
 
   async getLinkMeta(url: string): Promise<{ title: string | null; favicon: string | null }> {
+    if (this.isGithubMode()) {
+      return { title: null, favicon: null };
+    }
     try {
       return await this.request<{ title: string | null; favicon: string | null }>(
         `/v1/link-meta?url=${encodeURIComponent(url)}`,
@@ -387,6 +521,9 @@ export class ApiClient {
     onEvent: (ev: AgentEvent) => void,
     signal?: AbortSignal,
   ): Promise<void> {
+    if (this.isGithubMode()) {
+      throw new Error('L\'assistente AI richiede l\'esecuzione locale dell\'app con backend Node.');
+    }
     const token = this.getToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

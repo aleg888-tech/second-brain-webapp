@@ -58,6 +58,9 @@ export interface TreeProps {
   onOpenAlignIds?: () => void;
   linkMetaEnabled?: boolean;
   onToggleLinkMeta?: () => void;
+  isGithubMode?: boolean;
+  githubRepo?: string;
+  onOpenGithubSettings?: () => void;
 }
 
 export function Tree({
@@ -85,6 +88,9 @@ export function Tree({
   onToggleTheme,
   chatOpen,
   onToggleChat,
+  isGithubMode,
+  githubRepo,
+  onOpenGithubSettings,
 }: TreeProps) {
   const [filterQuery, setFilterQuery] = useState('');
   const [localCollapsed, setLocalCollapsed] = useState<Set<string>>(new Set());
@@ -586,6 +592,37 @@ export function Tree({
                 onClick={onToggleTheme}
               >
                 {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+              </button>
+            )}
+            {isGithubMode && (
+              <button
+                className="sidebar-action-btn"
+                title={`GitHub: ${githubRepo || 'aleg888-tech/second-brain'}. Clicca per impostazioni.`}
+                onClick={onOpenGithubSettings}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: 'var(--text-main)',
+                  padding: '3px 8px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-subtle)',
+                  background: 'var(--bg-card)',
+                  cursor: 'pointer',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: '#10b981',
+                  }}
+                />
+                <span>GitHub</span>
               </button>
             )}
           </div>
