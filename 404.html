@@ -1,20 +1,28 @@
 <!DOCTYPE html>
 <html lang="it">
   <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.github.com https://dashscope-intl.aliyuncs.com https://dashscope-us.aliyuncs.com https://dashscope.aliyuncs.com https://eu-central-1.maas.qwencloudapi.com http://127.0.0.1:* http://localhost:*; object-src 'none'; base-uri 'self';">
-    <meta name="referrer" content="no-referrer">
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.github.com https://dashscope-intl.aliyuncs.com https://dashscope-us.aliyuncs.com https://dashscope.aliyuncs.com https://eu-central-1.maas.qwencloudapi.com http://127.0.0.1:* http://localhost:*; object-src 'none'; base-uri 'self';">
+    <meta name="referrer" content="no-referrer">
     <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <title>brain — Knowledge Base</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧠</text></svg>">
-    <script type="module" crossorigin src="./assets/index-C92EBYjF.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index--Voz_d__.css">
+    <title>Caricamento...</title>
+    <script>
+      (function() {
+        var l = window.location;
+        var pathname = l.pathname;
+        var segments = pathname.split('/').filter(Boolean);
+        var isGitHubPages = l.hostname.endsWith('github.io');
+        var isSubfolder = (segments.length > 0 && segments[0] === 'second-brain-webapp') ||
+                          (isGitHubPages && segments.length > 1 && !segments[0].includes('.'));
+        var keepCount = isSubfolder ? 1 : 0;
+        var repoBase = isSubfolder ? '/' + segments[0] : '';
+        var routePath = segments.slice(keepCount).join('/');
+        var search = l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '';
+        var targetUrl = l.protocol + '//' + l.host + repoBase + '/?/' + encodeURI(routePath) + search + l.hash;
+        l.replace(targetUrl);
+      })();
+    </script>
   </head>
   <body>
-    <div id="root"></div>
   </body>
 </html>
