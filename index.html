@@ -16,19 +16,28 @@
         if (l.search && l.search.startsWith('?/')) {
           var query = l.search.slice(2);
           var parts = query.split('&');
-          var route = decodeURIComponent(parts[0] || '');
+          var route = decodeURIComponent(parts[0] || '').replace(/^\/+|\/+$/g, '');
           var restSearch = parts.slice(1).map(function(s) {
             return s.replace(/~and~/g, '&');
           }).join('&');
           var basePath = l.pathname.replace(/\/+$/, '');
-          var cleanPath = basePath + '/' + route;
-          var newUrl = cleanPath + (restSearch ? '?' + restSearch : '') + l.hash;
+          var newUrl = basePath + '/';
+          if (route === 'calendario' || route.indexOf('calendario/') === 0) {
+            newUrl = basePath + '/#/calendario' + (restSearch ? '?' + restSearch : '');
+          } else if (route === 'ai' || route.indexOf('ai/') === 0) {
+            newUrl = basePath + '/#/' + route;
+          } else if (route && route !== 'index.html') {
+            var pageCode = route.indexOf('pagina/') === 0 ? route.slice(7) : route;
+            newUrl = basePath + '/?p=' + encodeURIComponent(pageCode) + (restSearch ? '&' + restSearch : '') + l.hash;
+          } else {
+            newUrl = basePath + '/' + (restSearch ? '?' + restSearch : '') + l.hash;
+          }
           window.history.replaceState(null, null, newUrl);
         }
       })(window.location);
     </script>
-    <script type="module" crossorigin src="./assets/index-P-Zzb9qk.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-C61w9Ts5.css">
+    <script type="module" crossorigin src="./assets/index--alqCpvi.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-3n4Y0GUs.css">
   </head>
   <body>
     <div id="root"></div>
